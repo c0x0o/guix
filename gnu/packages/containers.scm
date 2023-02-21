@@ -41,6 +41,7 @@
   #:use-module (gnu packages gnupg)
   #:use-module (gnu packages golang)
   #:use-module (gnu packages linux)
+  #:use-module (gnu packages perl)
   #:use-module (gnu packages python)
   #:use-module (gnu packages networking)
   #:use-module (gnu packages pkg-config)
@@ -405,4 +406,71 @@ configure network interfaces in Linux containers.")
      "Podman (the POD MANager) is a tool for managing containers and images,
 volumes mounted into those containers, and pods made from groups of
 containers.")
+    (license license:asl2.0)))
+
+(define-public buildah
+  (package
+    (name "buildah")
+    (version "1.29.0")
+    (source (origin
+              (method git-fetch)
+              (uri (git-reference
+                    (url "https://github.com/containers/buildah")
+                    (commit (string-append "v" version))))
+              (file-name (git-file-name name version))
+              (sha256
+               (base32
+                "16kc19m5in819624c3np4aqb9hkjc93d34y4958jqy1k3p2p5rir"))))
+    (build-system gnu-build-system)
+    (arguments
+     (list #:make-flags #~(list #$(string-append "CC="
+                                                 (cc-for-target))
+                                (string-append "PREFIX="
+                                               #$output))
+           #:tests? #f
+           #:phases #~(modify-phases %standard-phases
+                        (delete 'configure)
+                        (add-after 'unpack 'set-env
+                          (lambda* (#:key inputs #:allow-other-keys)
+                            (setenv "HOME" "/tmp")))
+                        (add-after 'unpack 'avoid-building-tools
+                          (lambda _
+                            (substitute* "Makefile"
+                              (("^docs: install\\.tools")
+                               "docs:"))))
+                        (add-after 'unpack 'avoid-unnecessary-targets
+                          (lambda _
+                            (substitute* "Makefile"
+                              (("^all: .*")
+                               "all: bin/buildah docs"))))
+                        (add-after 'unpack 'use-doc-tools
+                          (lambda _
+                            (substitute* "docs/Makefile"
+                              (("../tests/tools/build/go-md2man")
+                               (which "go-md2man")))))
+                        (add-after 'install 'install-completions
+                          (lambda _
+                            (invoke "make" "install.completions"
+                                    (string-append "PREFIX="
+                                                   #$output)))))))
+    (inputs (list btrfs-progs
+                  cni-plugins
+                  conmon
+                  eudev
+                  glib
+                  go-github-com-go-md2man
+                  gpgme
+                  libassuan
+                  libseccomp
+                  lvm2
+                  runc))
+    (native-inputs (list bats git go-1.18 perl pkg-config))
+    (synopsis
+     "Facilitates building Open Container Initiative (OCI) container images")
+    (description
+     "Buildah is an open source, Linux-based tool used to build Open Container
+Initiative (OCI)-compatible containers.  With Buildah, you can use your
+favorite tools to create efficient container images from an existing base image
+or from scratch using an empty image.")
+    (home-page "https://buildah.io")
     (license license:asl2.0)))
