@@ -327,6 +327,9 @@ configure network interfaces in Linux containers.")
        (file-name (git-file-name name version))))
 
     (build-system gnu-build-system)
+    (outputs '("out" "docker"))
+    (properties
+      `((output-synopsis "docker" "docker alias for podman")))
     (arguments
      (list
       #:make-flags
@@ -349,7 +352,7 @@ configure network interfaces in Linux containers.")
                 (invoke "make" "localsystem")
                 (invoke "make" "remotesystem"))))
           (add-after 'unpack 'fix-hardcoded-paths
-            (lambda _
+            (lambda* (#:key outputs #:allow-other-keys)
               (substitute* (find-files "libpod" "\\.go")
                 (("exec.LookPath[(][\"]slirp4netns[\"][)]")
                  (string-append "exec.LookPath(\""
@@ -365,7 +368,14 @@ configure network interfaces in Linux containers.")
                 (("/usr/local/libexec/cni")
                  (string-append #$(this-package-input "cni-plugins")
                                 "/bin"))
-                (("/usr/bin/crun") (which "crun")))))
+                (("/usr/bin/crun") (which "crun")))
+              (substitute* "docker"
+                (("/usr/bin/podman") (string-append (assoc-ref outputs "out")
+                                                    "/bin/podman")))))
+          (add-after 'install 'install-docker
+            (lambda* (#:key outputs #:allow-other-keys)
+              (let* ((docker (assoc-ref outputs "docker")))
+                (install-file "docker" (string-append docker "/bin")) #t)))
           (add-after 'install 'install-completions
             (lambda _
               (invoke "make" "install.completions"
