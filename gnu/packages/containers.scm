@@ -376,7 +376,7 @@ configure network interfaces in Linux containers.")
           (add-after 'install 'install-docker
             (lambda* (#:key outputs #:allow-other-keys)
               (let* ((docker (assoc-ref outputs "docker")))
-                (install-file "docker" (string-append docker "/bin")) #t)))
+                (install-file "docker" (string-append docker "/bin")))))
           (add-after 'install 'install-completions
             (lambda _
               (invoke "make" "install.completions"
